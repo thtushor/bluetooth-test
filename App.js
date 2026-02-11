@@ -1,5 +1,6 @@
+
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -13,17 +14,28 @@ import {
   Alert,
   TextInput,
   ActivityIndicator,
-  SectionList
+  SectionList,
+  Dimensions,
+  SafeAreaView
 } from 'react-native';
+import { WebView } from 'react-native-webview';
+import { formatDataForPrinter } from './utils/PrinterService';
+import { byteArrayToBase64 } from './utils/Base64';
 
 const { BluetoothModule } = NativeModules;
-// Prevent crash if native module is not yet available
 const eventEmitter = BluetoothModule ? new NativeEventEmitter(BluetoothModule) : {
   addListener: () => ({ remove: () => { } }),
   removeAllListeners: () => { },
 };
 
+const WEB_APP_URL = 'https://glorypos.com'; // Adjust if needed
+
 export default function App() {
+  const [currentScreen, setCurrentScreen] = useState('webview'); // 'webview' | 'bluetooth'
+  const [printData, setPrintData] = useState(null);
+  const [printType, setPrintType] = useState(null); // 'INVOICE' | 'KOT' | 'BARCODE'
+
+  // Bluetooth State
   const [pairedDevices, setPairedDevices] = useState([]);
   const [scannedDevices, setScannedDevices] = useState([]);
   const [scanning, setScanning] = useState(false);
@@ -31,20 +43,20 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [logs, setLogs] = useState([]);
 
+  // Setup Listeners
   useEffect(() => {
-    if (!BluetoothModule) {
-      console.warn("BluetoothModule is null. Native build may be required.");
-      return;
+    if (!BluetoothModule) return;
+
+    // Initial permissions and load
+    if (Platform.OS === 'android') {
+      requestPermissions();
     }
-    requestPermissions();
     fetchPairedDevices();
 
     const deviceFoundListener = eventEmitter.addListener('DeviceFound', (device) => {
-      setScannedDevices((prevDevices) => {
-        if (!prevDevices.find(d => d.address === device.address)) {
-          return [...prevDevices, device];
-        }
-        return prevDevices;
+      setScannedDevices((prev) => {
+        if (!prev.find(d => d.address === device.address)) return [...prev, device];
+        return prev;
       });
     });
 
@@ -54,17 +66,16 @@ export default function App() {
   }, []);
 
   const requestPermissions = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.requestMultiple([
+    try {
+      if (Platform.OS === 'android') {
+        await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
         ]);
-        console.log('Permissions:', granted);
-      } catch (err) {
-        console.warn(err);
       }
+    } catch (err) {
+      console.warn(err);
     }
   };
 
@@ -73,23 +84,36 @@ export default function App() {
       const devices = await BluetoothModule.getPairedDevices();
       setPairedDevices(devices);
     } catch (e) {
-      console.warn("Failed to fetch paired devices", e);
+      console.warn("Fetch paired failed", e);
     }
   };
 
-  const startScan = async () => {
-    if (!BluetoothModule) {
-      Alert.alert("Native Module Missing", "The native Bluetooth module is not linked. Please wait for the build to complete and reinstall the app.");
-      return;
+  const handleWebViewMessage = (event) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      // Expected format: { type: 'PRINT_INVOICE' | 'PRINT_KOT' | 'PRINT_BARCODE' | 'PRINT_BARCODE_LABEL', payload: object }
+
+      if (data.type && data.type.startsWith('PRINT_')) {
+        const type = data.type.replace('PRINT_', '');
+        setPrintType(type);
+        setPrintData(data.payload);
+        setCurrentScreen('bluetooth');
+        Alert.alert("Print Request", `Received ${type} print request. Please select a printer.`);
+      }
+    } catch (e) {
+      console.error("Failed to parse webview message", e);
     }
+  };
+
+  // --- Bluetooth Logic ---
+
+  const startScan = async () => {
     try {
       setScannedDevices([]);
       setScanning(true);
-      const result = await BluetoothModule.startScan();
-      console.log(result);
+      await BluetoothModule.startScan();
     } catch (e) {
-      console.error(e);
-      Alert.alert("Error starting scan", e.message);
+      Alert.alert("Scan Error", e.message);
       setScanning(false);
     }
   };
@@ -98,21 +122,16 @@ export default function App() {
     try {
       await BluetoothModule.stopScan();
       setScanning(false);
-      console.log("Scan stopped");
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.warn(e); }
   };
 
   const connectToDevice = async (device) => {
     try {
-      if (scanning) {
-        await stopScan();
-      }
-      console.log(`Connecting to ${device.name}...`);
-      const result = await BluetoothModule.connect(device.address);
+      if (scanning) await stopScan();
+      Alert.alert("Connecting", `Connecting to ${device.name || "device"}...`);
+      const res = await BluetoothModule.connect(device.address);
       setConnectedDevice(device);
-      Alert.alert("Connected", result);
+      Alert.alert("Connected", res);
     } catch (e) {
       Alert.alert("Connection Failed", e.message);
     }
@@ -120,13 +139,9 @@ export default function App() {
 
   const pairDevice = async (device) => {
     try {
-      if (scanning) {
-        await stopScan();
-      }
-      Alert.alert("Pairing", `Initiating pairing with ${device.name || device.address}`);
+      if (scanning) await stopScan();
       await BluetoothModule.pairDevice(device.address);
-      // Refresh paired devices after a delay or wait for event (for now, manual refresh or assume success/user action)
-      // Ideally we should listen to BOND_STATE_CHANGED
+      Alert.alert("Pairing", "Pairing initiated. Please check device.");
     } catch (e) {
       Alert.alert("Pairing Failed", e.message);
     }
@@ -136,27 +151,43 @@ export default function App() {
     try {
       await BluetoothModule.disconnect();
       setConnectedDevice(null);
-      Alert.alert("Disconnected");
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.warn(e); }
   };
 
-  const sendData = async () => {
+  // --- Printing Logic ---
+
+  const handlePrint = async () => {
     if (!connectedDevice) {
-      Alert.alert("Error", "No device connected");
+      Alert.alert("No Printer", "Please connect to a bluetooth printer first.");
       return;
     }
+    if (!printData) {
+      Alert.alert("No Data", "No print data found.");
+      return;
+    }
+
     try {
-      await BluetoothModule.sendData(message + "\n");
-      setLogs(prev => [`Sent: ${message}`, ...prev]);
-      setMessage('');
+      const commands = formatDataForPrinter(printType, printData);
+      if (commands.length === 0) {
+        Alert.alert("Error", "Could not format data for printing.");
+        return;
+      }
+
+      const base64Data = byteArrayToBase64(commands);
+      await BluetoothModule.printRawData(base64Data);
+
+      Alert.alert("Success", "Print command sent!", [
+        { text: "Back to Web", onPress: () => setCurrentScreen('webview') },
+        { text: "Stay", style: "cancel" }
+      ]);
     } catch (e) {
-      Alert.alert("Send Failed", e.message);
+      Alert.alert("Print Error", e.message);
     }
   };
 
-  const renderItem = ({ item }) => {
+  // --- Render ---
+
+  const renderDeviceItem = ({ item }) => {
     const isPaired = pairedDevices.some(d => d.address === item.address) || item.bonded;
     const isConnected = connectedDevice && connectedDevice.address === item.address;
 
@@ -170,25 +201,16 @@ export default function App() {
         </View>
         <View style={styles.deviceActions}>
           {!isPaired && !isConnected && (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.pairButton]}
-              onPress={() => pairDevice(item)}
-            >
+            <TouchableOpacity style={[styles.actionButton, styles.pairButton]} onPress={() => pairDevice(item)}>
               <Text style={styles.actionButtonText}>Pair</Text>
             </TouchableOpacity>
           )}
           {isConnected ? (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.disconnectButton]}
-              onPress={disconnect}
-            >
+            <TouchableOpacity style={[styles.actionButton, styles.disconnectButton]} onPress={disconnect}>
               <Text style={styles.actionButtonText}>Disconnect</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.connectButton]}
-              onPress={() => connectToDevice(item)}
-            >
+            <TouchableOpacity style={[styles.actionButton, styles.connectButton]} onPress={() => connectToDevice(item)}>
               <Text style={styles.actionButtonText}>Connect</Text>
             </TouchableOpacity>
           )}
@@ -197,116 +219,77 @@ export default function App() {
     );
   };
 
-  const sections = [
-    { title: "Paired Devices", data: pairedDevices },
-    { title: "Available Devices", data: scannedDevices.filter(d => !pairedDevices.find(pd => pd.address === d.address)) }
-  ];
+  if (currentScreen === 'webview') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <StatusBar style="auto" />
+        <WebView
+          source={{ uri: WEB_APP_URL }}
+          style={{ flex: 1 }}
+          onMessage={handleWebViewMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          renderLoading={() => <ActivityIndicator size="large" color="#007bff" style={{ position: 'absolute', top: '50%', left: '50%' }} />}
+        />
+        {/* Optional: Navigation Bar if needed, but we rely on Web */}
+        <View style={styles.tabBar}>
+          <Text style={styles.tabBarText}>GLORY POS</Text>
+          <TouchableOpacity onPress={() => setCurrentScreen('bluetooth')}>
+            <Text style={styles.settingsLink}>⚙ Printers</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
+  // Bluetooth Screen
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
       <View style={styles.header}>
-        <Text style={styles.title}>Bluetooth Manager</Text>
+        <TouchableOpacity onPress={() => setCurrentScreen('webview')}>
+          <Text style={styles.backButton}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Printer Manager</Text>
         <TouchableOpacity onPress={fetchPairedDevices}>
           <Text style={styles.refreshText}>↻</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.controls}>
-        <View style={styles.scanControls}>
-          <TouchableOpacity
-            style={[styles.button, scanning ? styles.stopButton : styles.scanButton]}
-            onPress={scanning ? stopScan : startScan}
-          >
-            <Text style={styles.buttonText}>{scanning ? "Stop Scan" : "Scan New Devices"}</Text>
+      {/* Print Action Area */}
+      {printData && (
+        <View style={styles.printActionArea}>
+          <Text style={styles.printActionTitle}>Ready to Print: {printType}</Text>
+          <TouchableOpacity style={styles.bigPrintButton} onPress={handlePrint}>
+            <Text style={styles.bigPrintButtonText}>PRINT {printType}</Text>
           </TouchableOpacity>
-          {scanning && <ActivityIndicator size="small" color="#007bff" />}
         </View>
+      )}
+
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={[styles.button, scanning ? styles.stopButton : styles.scanButton]}
+          onPress={scanning ? stopScan : startScan}
+        >
+          <Text style={styles.buttonText}>{scanning ? "Stop Scan" : "Scan New Devices"}</Text>
+        </TouchableOpacity>
+        {scanning && <ActivityIndicator size="small" color="#007bff" style={{ marginLeft: 10 }} />}
       </View>
 
       <SectionList
-        sections={sections}
-        renderItem={renderItem}
+        sections={[
+          { title: "Paired Devices", data: pairedDevices },
+          { title: "Available Devices", data: scannedDevices.filter(d => !pairedDevices.find(pd => pd.address === d.address)) }
+        ]}
+        renderItem={renderDeviceItem}
         renderSectionHeader={({ section: { title, data } }) => (
           data.length > 0 ? <Text style={styles.sectionHeader}>{title}</Text> : null
         )}
         keyExtractor={item => item.address}
         style={styles.list}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>{scanning ? "Scanning..." : "No new devices found. Start scan."}</Text>
-        }
       />
-
-      {connectedDevice && (
-        <View style={styles.communicationContainer}>
-          <Text style={styles.subtitle}>Send Data to {connectedDevice.name}</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Type message..."
-              value={message}
-              onChangeText={setMessage}
-            />
-            <TouchableOpacity style={[styles.button, styles.sendButton, { marginTop: 0, marginLeft: 10 }]} onPress={sendData}>
-              <Text style={styles.buttonText}>Send</Text>
-            </TouchableOpacity>
-          </View>
-
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.printButton]}
-              onPress={async () => {
-                try {
-                  const result = await BluetoothModule.printTestReceipt();
-                  Alert.alert("Success", result);
-                } catch (e) {
-                  Alert.alert("Print Error", e.message);
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Test Receipt</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.invoiceButton]}
-              onPress={async () => {
-                try {
-                  const result = await BluetoothModule.printInvoice();
-                  Alert.alert("Success", result);
-                } catch (e) {
-                  Alert.alert("Print Error", e.message);
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Print Invoice</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.kotButton]}
-              onPress={async () => {
-                try {
-                  const result = await BluetoothModule.printKOT();
-                  Alert.alert("Success", result);
-                } catch (e) {
-                  Alert.alert("Print Error", e.message);
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Print KOT</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={[styles.subtitle, { marginTop: 20 }]}>Logs</Text>
-          <FlatList
-            data={logs}
-            renderItem={({ item }) => <Text style={styles.logText}>{item}</Text>}
-            keyExtractor={(item, index) => index.toString()}
-            style={styles.logsList}
-          />
-        </View>
-      )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -317,7 +300,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'android' ? 30 : 0,
   },
   header: {
-    padding: 20,
+    padding: 15,
     backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
@@ -325,176 +308,54 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  refreshText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007bff',
-  },
-  controls: {
-    padding: 15,
-  },
-  scanControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  button: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanButton: {
-    backgroundColor: '#007bff',
-  },
-  stopButton: {
-    backgroundColor: '#dc3545',
-  },
-  disconnectButton: {
-    backgroundColor: '#6c757d',
-    marginTop: 10,
-  },
-  sendButton: {
-    backgroundColor: '#28a745',
-    marginTop: 10,
-  },
-  printButton: {
-    backgroundColor: '#6610f2',
-    flex: 1,
-  },
-  invoiceButton: {
-    backgroundColor: '#fd7e14',
-    flex: 1,
-  },
-  kotButton: {
-    backgroundColor: '#e83e8c',
-    flex: 1,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 15,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  list: {
-    flex: 1,
-    paddingHorizontal: 15,
-  },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    backgroundColor: '#e9ecef',
-    padding: 8,
-    color: '#495057',
-    marginTop: 10,
-    borderRadius: 4,
-  },
-  deviceItem: {
+  title: { fontSize: 18, fontWeight: 'bold' },
+  backButton: { fontSize: 16, color: '#007bff' },
+  refreshText: { fontSize: 24, fontWeight: 'bold', color: '#007bff' },
+  tabBar: {
+    padding: 10,
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
+    borderTopWidth: 1,
     borderColor: '#eee',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'center'
   },
-  deviceInfo: {
-    flex: 1,
-  },
-  deviceName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  deviceAddress: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  pairedLabel: {
-    fontSize: 10,
-    color: '#28a745',
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  connectedLabel: {
-    fontSize: 10,
-    color: '#007bff',
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  connectedDeviceItem: {
-    borderColor: '#007bff',
+  tabBarText: { fontWeight: 'bold' },
+  settingsLink: { color: '#666' },
+  printActionArea: {
     backgroundColor: '#e3f2fd',
-  },
-  deviceActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  pairButton: {
-    backgroundColor: '#ffc107',
-  },
-  connectButton: {
-    backgroundColor: '#17a2b8',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 20,
-  },
-  communicationContainer: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#ccc',
-    backgroundColor: '#fff',
-    height: '40%',
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  inputRow: {
-    flexDirection: 'row',
+    padding: 15,
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderColor: '#bbdefb'
   },
-  input: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+  printActionTitle: { fontSize: 16, marginBottom: 10, fontWeight: 'bold', color: '#0d47a1' },
+  bigPrintButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 25,
+    elevation: 3
   },
-  logsList: {
-    flex: 1,
-    marginTop: 10,
-  },
-  logText: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 4,
-  },
+  bigPrintButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  controls: { padding: 15, flexDirection: 'row', alignItems: 'center' },
+  button: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8, alignItems: 'center' },
+  scanButton: { backgroundColor: '#28a745' },
+  stopButton: { backgroundColor: '#dc3545' },
+  buttonText: { color: '#fff', fontWeight: '600' },
+  list: { flex: 1, paddingHorizontal: 15 },
+  sectionHeader: { fontSize: 14, fontWeight: 'bold', backgroundColor: '#e9ecef', padding: 8, marginTop: 10, borderRadius: 4 },
+  deviceItem: { backgroundColor: '#fff', padding: 15, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#eee', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  connectedDeviceItem: { borderColor: '#007bff', backgroundColor: '#f0f8ff' },
+  deviceInfo: { flex: 1 },
+  deviceName: { fontSize: 16, fontWeight: 'bold' },
+  deviceAddress: { fontSize: 12, color: '#666' },
+  pairedLabel: { fontSize: 10, color: '#28a745', fontWeight: 'bold' },
+  connectedLabel: { fontSize: 10, color: '#007bff', fontWeight: 'bold' },
+  deviceActions: { flexDirection: 'row', gap: 10 },
+  actionButton: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6 },
+  pairButton: { backgroundColor: '#ffc107' },
+  connectButton: { backgroundColor: '#17a2b8' },
+  disconnectButton: { backgroundColor: '#6c757d' },
+  actionButtonText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
 });

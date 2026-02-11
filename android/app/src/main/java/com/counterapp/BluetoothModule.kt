@@ -505,6 +505,22 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             promise.reject("PRINT_ERROR", "Failed to print KOT: ${e.message}")
         }
     }
+
+    @ReactMethod
+    fun printRawData(base64Data: String, promise: Promise) {
+        if (outputStream == null) {
+            promise.reject("NOT_CONNECTED", "No active connection to printer")
+            return
+        }
+
+        try {
+            val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+            outputStream?.write(decodedBytes)
+            promise.resolve("Data sent")
+        } catch (e: Exception) {
+            promise.reject("PRINT_ERROR", "Failed to send raw data: ${e.message}")
+        }
+    }
     
     @ReactMethod
     fun disconnect(promise: Promise) {
