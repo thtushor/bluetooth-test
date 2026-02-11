@@ -221,24 +221,28 @@ export default function App() {
 
   if (currentScreen === 'webview') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <StatusBar style="auto" />
+      <SafeAreaView style={styles.webViewContainer}>
+        <StatusBar style="dark" />
+
+        {/* Premium Top Bar */}
+        <View style={styles.topBar} />
+
         <WebView
           source={{ uri: WEB_APP_URL }}
-          style={{ flex: 1 }}
+          style={styles.webview}
           onMessage={handleWebViewMessage}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           startInLoadingState={true}
-          renderLoading={() => <ActivityIndicator size="large" color="#007bff" style={{ position: 'absolute', top: '50%', left: '50%' }} />}
+          renderLoading={() => (
+            <ActivityIndicator
+              size="large"
+              color="#000"
+              style={styles.loadingIndicator}
+            />
+          )}
         />
-        {/* Optional: Navigation Bar if needed, but we rely on Web */}
-        <View style={styles.tabBar}>
-          <Text style={styles.tabBarText}>GLORY POS</Text>
-          <TouchableOpacity onPress={() => setCurrentScreen('bluetooth')}>
-            <Text style={styles.settingsLink}>⚙ Printers</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={styles.topBar} />
       </SafeAreaView>
     );
   }
@@ -320,8 +324,60 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center'
   },
-  tabBarText: { fontWeight: 'bold' },
-  settingsLink: { color: '#666' },
+  webViewContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  topBar: {
+    height: 30,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    // borderBottomWidth: 1,
+    // borderBottomColor: '#f0f0f0',
+    // elevation: 2,
+    // shadowColor: '#000',
+    // shadowOffset: { width: 0, height: 1 },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 2,
+  },
+  brandTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#000',
+    letterSpacing: 1,
+  },
+  brandSubtitle: {
+    fontSize: 10,
+    color: '#666',
+    fontWeight: '600',
+    marginTop: -2,
+  },
+  printerCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  printerIcon: {
+    fontSize: 18,
+  },
+  webview: {
+    flex: 1,
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -20,
+    marginTop: -20,
+  },
   printActionArea: {
     backgroundColor: '#e3f2fd',
     padding: 15,
