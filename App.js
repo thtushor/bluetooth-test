@@ -42,6 +42,11 @@ export default function App() {
   const [connectedDevice, setConnectedDevice] = useState(null);
   const [message, setMessage] = useState('');
   const [logs, setLogs] = useState([]);
+  const webViewRef = useRef(null);
+
+  const reloadWebView = () => {
+    if (webViewRef.current) webViewRef.current.reload();
+  };
 
   // Setup Listeners
   useEffect(() => {
@@ -228,9 +233,15 @@ export default function App() {
         <StatusBar style="dark" />
 
         {/* Premium Top Bar */}
-        <View style={styles.topBar} />
+        <View style={styles.topBar}>
+          <Text style={styles.brandTitle}>GloryPOS</Text>
+          <TouchableOpacity onPress={reloadWebView} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={{ fontSize: 24, fontWeight: 'bold' }}>↻</Text>
+          </TouchableOpacity>
+        </View>
 
         <WebView
+          ref={webViewRef}
           source={{ uri: WEB_APP_URL }}
           style={styles.webview}
           onMessage={handleWebViewMessage}
@@ -332,7 +343,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   topBar: {
-    height: 30,
+    height: 50,
     backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
