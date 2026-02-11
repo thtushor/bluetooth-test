@@ -77,7 +77,6 @@ export const generateInvoiceCommands = (data) => {
     builder.add(PrinterCommands.INIT);
     builder.add(PrinterCommands.ALIGN_CENTER);
 
-    // Header: Restaurant name, location, tel
     if (data.businessInfo?.name) {
         builder.add(PrinterCommands.BOLD_ON);
         builder.add(PrinterCommands.TEXT_DOUBLE_SIZE);
@@ -94,78 +93,40 @@ export const generateInvoiceCommands = (data) => {
     }
 
     builder.textLine("-".repeat(32));
-
-    // Invoice Details Section (Left Aligned)
-    builder.add(PrinterCommands.ALIGN_LEFT);
     builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine("Invoice:");
+    builder.textLine("INVOICE");
     builder.add(PrinterCommands.BOLD_OFF);
+    builder.add(PrinterCommands.ALIGN_LEFT);
 
-    builder.textLine(`Invoice    : ${data.invoiceNumber || 'N/A'}`);
-    builder.textLine(`Date       : ${new Date(data.date).toLocaleString()}`);
+    builder.textLine(`Inv #: ${data.invoiceNumber || 'N/A'}`);
+    builder.textLine(`Date: ${new Date(data.date).toLocaleString()}`);
 
-    if (data.tableNumber) {
-        builder.textLine(`Table      : ${data.tableNumber}`);
-    }
-    if (data.guestNumber) {
-        builder.textLine(`Guests     : ${data.guestNumber}`);
-    }
-
-    builder.textLine(`Customer   : ${data.customer?.name || 'Walk-in Customer'}`);
-
-    if (data.customer?.phone) {
-        builder.textLine(`Phone      : ${data.customer.phone}`);
-    }
+    if (data.tableNumber) builder.textLine(`Table: ${data.tableNumber}`);
+    if (data.customer?.name) builder.textLine(`Cust: ${data.customer.name}`);
 
     builder.textLine("-".repeat(32));
-
-    // Items Header
     builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine("QTY  ITEM            TOTAL");
+    builder.textLine("Item            Qty    Total");
     builder.add(PrinterCommands.BOLD_OFF);
+    builder.textLine("-".repeat(32));
 
     // Items
     if (data.items) {
         data.items.forEach(item => {
-            const qty = `${item.quantity}x.`;
-            const name = item.productName.substring(0, 16);
-            const total = formatCurrency(item.subtotal).padStart(6, ' ');
-            builder.textLine(`${qty.padEnd(5, ' ')}${name.padEnd(16, ' ')}${total}`);
-
-            // Details on next line (category, etc.)
+            const name = item.productName.substring(0, 16).padEnd(16, ' ');
+            const qty = String(item.quantity).padStart(3, ' ');
+            const total = formatCurrency(item.subtotal).padStart(10, ' '); // Adjusted padding
+            builder.textLine(`${name} ${qty} ${total}`);
             if (item.details) {
-                builder.textLine(`-    ${item.details}`);
+                builder.textLine(`  ${item.details}`);
             }
         });
     }
 
     builder.textLine("-".repeat(32));
-
-    // Summary Section (Right Aligned)
-    builder.add(PrinterCommands.ALIGN_LEFT);
-
-    // Subtotal
-    const subtotal = data.summary?.subtotal || 0;
-    builder.textLine(`SUBTOTAL${formatCurrency(subtotal).padStart(24, ' ')}`);
-
-    // Discount (if applicable)
-    if (data.summary?.discount && parseFloat(data.summary.discount) > 0) {
-        const discountRate = data.summary?.discountRate || '0';
-        const discountAmount = data.summary?.discount || 0;
-        builder.textLine(`Discount      -(${discountRate}%)${formatCurrency(discountAmount).padStart(12, ' ')}`);
-    }
-
-    // VAT/Tax
-    if (data.summary?.tax && parseFloat(data.summary.tax) > 0) {
-        const taxRate = data.summary?.taxRate || '0';
-        builder.textLine(`Vat           (${taxRate}%)${formatCurrency(data.summary.tax).padStart(14, ' ')}`);
-    }
-
-    builder.textLine("-".repeat(32));
-
-    // Total
+    builder.add(PrinterCommands.ALIGN_RIGHT);
     builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine(`TOTAL${formatCurrency(data.summary?.total || 0).padStart(27, ' ')}`);
+    builder.textLine(`TOTAL: ${formatCurrency(data.summary?.total || 0)}`);
     builder.add(PrinterCommands.BOLD_OFF);
 
     builder.add(PrinterCommands.ALIGN_CENTER);
@@ -181,61 +142,46 @@ export const generateKOTCommands = (data) => {
     const builder = new CommandBuilder();
     builder.add(PrinterCommands.INIT);
     builder.add(PrinterCommands.ALIGN_CENTER);
+    builder.add(PrinterCommands.BOLD_ON);
+    builder.add(PrinterCommands.TEXT_DOUBLE_SIZE);
+    builder.textLine("KOT");
+    builder.add(PrinterCommands.TEXT_NORMAL);
+    builder.textLine("Kitchen Order Ticket");
+    builder.add(PrinterCommands.BOLD_OFF);
 
-    // Restaurant name
-    if (data.businessInfo?.name) {
+    builder.add(PrinterCommands.ALIGN_LEFT);
+    builder.textLine(`Date: ${new Date(data.date).toLocaleString()}`);
+    if (data.tableNumber) {
         builder.add(PrinterCommands.BOLD_ON);
-        builder.textLine(data.businessInfo.name);
+        builder.textLine(`Table: ${data.tableNumber}`);
         builder.add(PrinterCommands.BOLD_OFF);
     }
-
-    // "KITCHEN ORDER TICKET (KOT)" header
-    builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine("KITCHEN ORDER TICKET (KOT)");
-    builder.add(PrinterCommands.BOLD_OFF);
-
-    // DATE
-    builder.textLine(new Date(data.date).toLocaleString());
+    if (data.guestNumber) builder.textLine(`Guests: ${data.guestNumber}`);
 
     builder.textLine("-".repeat(32));
-
-    // Table and Guests (Left Aligned)
-    builder.add(PrinterCommands.ALIGN_LEFT);
-
-    if (data.tableNumber) {
-        builder.textLine(`Table No   : ${data.tableNumber}`);
-    }
-    if (data.guestNumber) {
-        builder.textLine(`Guests     : ${data.guestNumber}`);
-    }
-
+    builder.add(PrinterCommands.BOLD_ON);
+    builder.textLine("Qty  Item");
+    builder.add(PrinterCommands.BOLD_OFF);
     builder.textLine("-".repeat(32));
 
-    // Items Header
-    builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine("QTY  ITEM");
-    builder.add(PrinterCommands.BOLD_OFF);
-
-    // Items List
     if (data.items) {
         data.items.forEach(item => {
-            const qty = `${item.quantity}x`;
-            builder.textLine(`${qty.padEnd(5, ' ')}${item.productName}`);
-
-            // Details/category on next line with "-" prefix
+            builder.add(PrinterCommands.BOLD_ON);
+            builder.textLine(`${item.quantity} x ${item.productName}`);
+            builder.add(PrinterCommands.BOLD_OFF);
             if (item.details) {
-                builder.textLine(`-    ${item.details}`);
+                builder.textLine(`   Details: ${item.details}`);
             }
         });
     }
 
     builder.textLine("-".repeat(32));
-
-    // Total Items count
-    const totalItems = data.items ? data.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
-    builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine(`TOTAL ITEMS:${String(totalItems).padStart(20, ' ')}`);
-    builder.add(PrinterCommands.BOLD_OFF);
+    if (data.specialNotes) {
+        builder.add(PrinterCommands.BOLD_ON);
+        builder.textLine("NOTES:");
+        builder.textLine(data.specialNotes);
+        builder.add(PrinterCommands.BOLD_OFF);
+    }
 
     builder.add(PrinterCommands.FEED_LINES(3));
     builder.add(PrinterCommands.CUT);
