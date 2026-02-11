@@ -284,6 +284,227 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             promise.reject("SEND_FAILED", "Error sending data: ${e.message}")
         }
     }
+
+    @ReactMethod
+    fun printTestReceipt(promise: Promise) {
+        if (outputStream == null) {
+            promise.reject("NOT_CONNECTED", "No active connection to printer")
+            return
+        }
+
+        try {
+            val os = outputStream!!
+            
+            // ESC/POS Commands
+            val ESC = 0x1B.toByte()
+            val GS = 0x1D.toByte()
+            val ENTER = 0x0A.toByte()
+            
+            val reset = byteArrayOf(ESC, '@'.toByte())
+            val alignCenter = byteArrayOf(ESC, 'a'.toByte(), 1)
+            val alignLeft = byteArrayOf(ESC, 'a'.toByte(), 0)
+            val boldOn = byteArrayOf(ESC, 'E'.toByte(), 1)
+            val boldOff = byteArrayOf(ESC, 'E'.toByte(), 0)
+            val doubleHeight = byteArrayOf(GS, '!'.toByte(), 0x10) // Double height
+            val normalSize = byteArrayOf(GS, '!'.toByte(), 0x00)
+            val feed = byteArrayOf(ESC, 'd'.toByte(), 3) // Feed 3 lines
+            
+            // Print Content
+            os.write(reset)
+            
+            // Title
+            os.write(alignCenter)
+            os.write(boldOn)
+            os.write(doubleHeight)
+            os.write("TEST RECEIPT".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(normalSize)
+            os.write(boldOff)
+            os.write(byteArrayOf(ENTER))
+            
+            // Body
+            os.write(alignLeft)
+            os.write("Printer Connection Successful!".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("--------------------------------".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Date: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(byteArrayOf(ENTER))
+            os.write("Thank you for using".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Native Bluetooth Module".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            // Feed and Cut (if supported, or just feed)
+            os.write(feed)
+            
+            promise.resolve("Test receipt printed")
+        } catch (e: Exception) {
+            promise.reject("PRINT_ERROR", "Failed to print test receipt: ${e.message}")
+        }
+    }
+
+    @ReactMethod
+    fun printInvoice(promise: Promise) {
+        if (outputStream == null) {
+            promise.reject("NOT_CONNECTED", "No active connection to printer")
+            return
+        }
+
+        try {
+            val os = outputStream!!
+            
+            // ESC/POS Commands
+            val ESC = 0x1B.toByte()
+            val GS = 0x1D.toByte()
+            val ENTER = 0x0A.toByte()
+            
+            val reset = byteArrayOf(ESC, '@'.toByte())
+            val alignCenter = byteArrayOf(ESC, 'a'.toByte(), 1)
+            val alignLeft = byteArrayOf(ESC, 'a'.toByte(), 0)
+            val alignRight = byteArrayOf(ESC, 'a'.toByte(), 2)
+            val boldOn = byteArrayOf(ESC, 'E'.toByte(), 1)
+            val boldOff = byteArrayOf(ESC, 'E'.toByte(), 0)
+            val doubleHeight = byteArrayOf(GS, '!'.toByte(), 0x10)
+            val normalSize = byteArrayOf(GS, '!'.toByte(), 0x00)
+            val feed = byteArrayOf(ESC, 'd'.toByte(), 3)
+            
+            os.write(reset)
+            
+            // Header
+            os.write(alignCenter)
+            os.write(boldOn)
+            os.write(doubleHeight)
+            os.write("RESTAURANT INVOICE".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(normalSize)
+            os.write(boldOff)
+            os.write("123 Food Street, City".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Tel: +123 456 7890".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(byteArrayOf(ENTER))
+            
+            // Invoice Details
+            os.write(alignLeft)
+            os.write("Inv #: 1001".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Date: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("--------------------------------".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            // Items
+            os.write("Item            Qty    Price".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("--------------------------------".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            os.write("Burger          2      20.00".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Pizza           1      15.00".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Coke            3       6.00".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            os.write("--------------------------------".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            // Total
+            os.write(alignRight)
+            os.write(boldOn)
+            os.write("TOTAL: $41.00".toByteArray())
+            os.write(boldOff)
+            os.write(byteArrayOf(ENTER))
+            os.write(byteArrayOf(ENTER))
+            
+            // Footer
+            os.write(alignCenter)
+            os.write("Thank you for dining with us!".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            os.write(feed)
+            
+            promise.resolve("Invoice printed")
+        } catch (e: Exception) {
+            promise.reject("PRINT_ERROR", "Failed to print invoice: ${e.message}")
+        }
+    }
+
+    @ReactMethod
+    fun printKOT(promise: Promise) {
+        if (outputStream == null) {
+            promise.reject("NOT_CONNECTED", "No active connection to printer")
+            return
+        }
+
+        try {
+            val os = outputStream!!
+            
+            // ESC/POS Commands
+            val ESC = 0x1B.toByte()
+            val GS = 0x1D.toByte()
+            val ENTER = 0x0A.toByte()
+            
+            val reset = byteArrayOf(ESC, '@'.toByte())
+            val alignCenter = byteArrayOf(ESC, 'a'.toByte(), 1)
+            val alignLeft = byteArrayOf(ESC, 'a'.toByte(), 0)
+            val boldOn = byteArrayOf(ESC, 'E'.toByte(), 1)
+            val boldOff = byteArrayOf(ESC, 'E'.toByte(), 0)
+            val doubleHeightWidth = byteArrayOf(GS, '!'.toByte(), 0x11) // Double height & width
+            val normalSize = byteArrayOf(GS, '!'.toByte(), 0x00)
+            val feed = byteArrayOf(ESC, 'd'.toByte(), 3)
+            
+            os.write(reset)
+            
+            // Header
+            os.write(alignCenter)
+            os.write(boldOn)
+            os.write(doubleHeightWidth)
+            os.write("KOT".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(normalSize)
+            os.write("Kitchen Order Ticket".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(byteArrayOf(ENTER))
+            
+            // Details
+            os.write(alignLeft)
+            os.write(boldOn)
+            os.write("Table: 5".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("Server: John".toByteArray())
+            os.write(boldOff)
+            os.write(byteArrayOf(ENTER))
+            os.write("Time: ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("--------------------------------".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            // Items
+            os.write(boldOn)
+            os.write("2 x Burger".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("  - No Onion".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("1 x Pizza".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write("3 x Coke".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            os.write(boldOff)
+            
+            os.write(byteArrayOf(ENTER))
+            os.write("--------------------------------".toByteArray())
+            os.write(byteArrayOf(ENTER))
+            
+            os.write(feed)
+            
+            promise.resolve("KOT printed")
+        } catch (e: Exception) {
+            promise.reject("PRINT_ERROR", "Failed to print KOT: ${e.message}")
+        }
+    }
     
     @ReactMethod
     fun disconnect(promise: Promise) {

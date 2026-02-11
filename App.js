@@ -252,6 +252,51 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.printButton]}
+              onPress={async () => {
+                try {
+                  const result = await BluetoothModule.printTestReceipt();
+                  Alert.alert("Success", result);
+                } catch (e) {
+                  Alert.alert("Print Error", e.message);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Test Receipt</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.invoiceButton]}
+              onPress={async () => {
+                try {
+                  const result = await BluetoothModule.printInvoice();
+                  Alert.alert("Success", result);
+                } catch (e) {
+                  Alert.alert("Print Error", e.message);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Print Invoice</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.kotButton]}
+              onPress={async () => {
+                try {
+                  const result = await BluetoothModule.printKOT();
+                  Alert.alert("Success", result);
+                } catch (e) {
+                  Alert.alert("Print Error", e.message);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Print KOT</Text>
+            </TouchableOpacity>
+          </View>
+
           <Text style={[styles.subtitle, { marginTop: 20 }]}>Logs</Text>
           <FlatList
             data={logs}
@@ -318,6 +363,23 @@ const styles = StyleSheet.create({
   sendButton: {
     backgroundColor: '#28a745',
     marginTop: 10,
+  },
+  printButton: {
+    backgroundColor: '#6610f2',
+    flex: 1,
+  },
+  invoiceButton: {
+    backgroundColor: '#fd7e14',
+    flex: 1,
+  },
+  kotButton: {
+    backgroundColor: '#e83e8c',
+    flex: 1,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 15,
   },
   buttonText: {
     color: '#fff',
