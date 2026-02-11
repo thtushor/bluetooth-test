@@ -36,6 +36,12 @@ function formatCurrency(amount) {
     return parseFloat(amount).toFixed(2);
 }
 
+function formatDate(date) {
+    const d = new Date(date);
+    const pad = (num) => num.toString().padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 // Utility to create command buffer
 class CommandBuilder {
     constructor() {
@@ -80,7 +86,7 @@ export const generateInvoiceCommands = (data) => {
     // Header: Restaurant name, location, tel
     if (data.businessInfo?.name) {
         builder.add(PrinterCommands.BOLD_ON);
-        builder.add(PrinterCommands.TEXT_DOUBLE_SIZE);
+        builder.add(PrinterCommands.TEXT_DOUBLE_WIDTH);
         builder.textLine(data.businessInfo.name);
         builder.add(PrinterCommands.TEXT_NORMAL);
         builder.add(PrinterCommands.BOLD_OFF);
@@ -102,7 +108,7 @@ export const generateInvoiceCommands = (data) => {
     builder.add(PrinterCommands.BOLD_OFF);
 
     builder.textLine(`Invoice    : ${data.invoiceNumber || 'N/A'}`);
-    builder.textLine(`Date       : ${new Date(data.date).toLocaleString()}`);
+    builder.textLine(`Date       : ${formatDate(data.date)}`);
 
     if (data.tableNumber) {
         builder.textLine(`Table      : ${data.tableNumber}`);
@@ -121,20 +127,23 @@ export const generateInvoiceCommands = (data) => {
 
     // Items Header
     builder.add(PrinterCommands.BOLD_ON);
-    builder.textLine("QTY  ITEM            TOTAL");
+    builder.textLine("QTY ITEM                   TOTAL");
     builder.add(PrinterCommands.BOLD_OFF);
 
     // Items
     if (data.items) {
         data.items.forEach(item => {
-            const qty = `${item.quantity}x.`;
-            const name = item.productName.substring(0, 16);
-            const total = formatCurrency(item.subtotal).padStart(6, ' ');
-            builder.textLine(`${qty.padEnd(5, ' ')}${name.padEnd(16, ' ')}${total}`);
+            const qty = `${item.quantity}x`;
+            const name = item.productName.substring(0, 18);
+            const total = formatCurrency(item.subtotal);
+
+            // 32 chars width: Qty(4) + Name(18) + Total(10)
+            const line = `${qty.padEnd(4, ' ')}${name.padEnd(18, ' ')}${total.padStart(10, ' ')}`;
+            builder.textLine(line);
 
             // Details on next line (category, etc.)
             if (item.details) {
-                builder.textLine(`-    ${item.details}`);
+                builder.textLine(`    - ${item.details}`);
             }
         });
     }
@@ -152,13 +161,17 @@ export const generateInvoiceCommands = (data) => {
     if (data.summary?.discount && parseFloat(data.summary.discount) > 0) {
         const discountRate = data.summary?.discountRate || '0';
         const discountAmount = data.summary?.discount || 0;
-        builder.textLine(`Discount      -(${discountRate}%)${formatCurrency(discountAmount).padStart(12, ' ')}`);
+        const label = `Discount (${discountRate}%)`;
+        const value = `-${formatCurrency(discountAmount)}`;
+        builder.textLine(`${label.padEnd(22, ' ')}${value.padStart(10, ' ')}`);
     }
 
     // VAT/Tax
     if (data.summary?.tax && parseFloat(data.summary.tax) > 0) {
         const taxRate = data.summary?.taxRate || '0';
-        builder.textLine(`Vat           (${taxRate}%)${formatCurrency(data.summary.tax).padStart(14, ' ')}`);
+        const label = `Vat (${taxRate}%)`;
+        const value = formatCurrency(data.summary.tax);
+        builder.textLine(`${label.padEnd(22, ' ')}${value.padStart(10, ' ')}`);
     }
 
     builder.textLine("-".repeat(32));

@@ -98,7 +98,10 @@ export default function App() {
         setPrintType(type);
         setPrintData(data.payload);
         setCurrentScreen('bluetooth');
-        Alert.alert("Print Request", `Received ${type} print request. Please select a printer.`);
+        const alertMsg = connectedDevice
+          ? `Received ${type} print request.\nConnected to: ${connectedDevice.name || 'Device'}`
+          : `Received ${type} print request. Please select a printer.`;
+        Alert.alert("Print Request", alertMsg);
       }
     } catch (e) {
       console.error("Failed to parse webview message", e);
