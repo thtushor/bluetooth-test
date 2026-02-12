@@ -18,7 +18,10 @@ import {
   SectionList,
   Dimensions,
   SafeAreaView,
-  Image
+  Image,
+  BackHandler,
+  ScrollView,
+  RefreshControl
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { formatDataForPrinter } from './utils/PrinterService';
@@ -48,10 +51,21 @@ export default function App() {
   const [message, setMessage] = useState('');
   const [logs, setLogs] = useState([]);
   const webViewRef = useRef(null);
+  const canGoBack = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const reloadWebView = () => {
     if (webViewRef.current) webViewRef.current.reload();
   };
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    reloadWebView();
+    // Fallback in case onLoadEnd doesn't fire immediately
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 2000);
+  }, []);
 
   useEffect(() => {
     const prepare = async () => {
@@ -91,6 +105,22 @@ export default function App() {
     return () => {
       deviceFoundListener.remove();
     };
+  }, []);
+
+  // Back handler for Android
+  useEffect(() => {
+    const onBackPress = () => {
+      if (canGoBack.current && webViewRef.current) {
+        webViewRef.current.goBack();
+        return true;
+      }
+      return false;
+    };
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      onBackPress
+    );
+    return () => backHandler.remove();
   }, []);
 
   const requestPermissions = async () => {
@@ -272,29 +302,58 @@ export default function App() {
 
         {/* Premium Top Bar */}
         <View style={styles.topBar}>
-          <Text style={styles.brandTitle}>GloryPOS</Text>
-          <TouchableOpacity onPress={reloadWebView} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={{ fontSize: 24, fontWeight: 'bold' }}>↻</Text>
-          </TouchableOpacity>
+          {/* Empty or can add branding later */}
         </View>
 
-        <WebView
-          ref={webViewRef}
-          source={{ uri: WEB_APP_URL }}
-          style={styles.webview}
-          onMessage={handleWebViewMessage}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <ActivityIndicator
-              size="large"
-              color="#000"
-              style={styles.loadingIndicator}
+        <ScrollView
+          contentContainerStyle={{ flex: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
             />
-          )}
-        />
-        <View style={styles.topBar} />
+          }
+        >
+          <WebView
+            ref={webViewRef}
+            source={{ uri: WEB_APP_URL }}
+            style={styles.webview}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            onLoadEnd={() => setRefreshing(false)}
+            onNavigationStateChange={(navState) => {
+              canGoBack.current = navState.canGoBack;
+            }}
+            onShouldStartLoadWithRequest={(request) => {
+              // Always open all links inside the WebView itself
+              if (
+                request.url.startsWith("https") ||
+                request.url.startsWith("http")
+              ) {
+                return true;
+              }
+              return false;
+            }}
+            renderLoading={() => (
+              <ActivityIndicator
+                size="large"
+                color="#000"
+                style={styles.loadingIndicator}
+              />
+            )}
+          />
+        </ScrollView>
+        {Platform.OS === "android" && (
+          <View
+            style={{
+              height: 10,
+              backgroundColor: "#fff",
+            }}
+          />
+        )}
+
       </SafeAreaView>
     );
   }
@@ -379,21 +438,34 @@ const styles = StyleSheet.create({
   webViewContainer: {
     flex: 1,
     backgroundColor: '#fff',
+    position: 'relative', // Ensure floating button works
+  },
+  floatingReloadButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 99,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   topBar: {
     height: 50,
     backgroundColor: '#fff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    // borderBottomWidth: 1,
-    // borderBottomColor: '#f0f0f0',
-    // elevation: 2,
-    // shadowColor: '#000',
-    // shadowOffset: { width: 0, height: 1 },
-    // shadowOpacity: 0.1,
-    // shadowRadius: 2,
+    elevation: 4, // Android shadow
+    shadowColor: '#000', // iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    zIndex: 10,
   },
   brandTitle: {
     fontSize: 16,
