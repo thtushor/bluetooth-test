@@ -295,116 +295,119 @@ export default function App() {
     );
   }
 
-  if (currentScreen === 'webview') {
-    return (
-      <SafeAreaView style={styles.webViewContainer}>
-        <StatusBar style="dark" />
-
-        {/* Premium Top Bar */}
-        <View style={styles.topBar}>
-          {/* Empty or can add branding later */}
-        </View>
-
-        <ScrollView
-          contentContainerStyle={{ flex: 1 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-            />
-          }
-        >
-          <WebView
-            ref={webViewRef}
-            source={{ uri: WEB_APP_URL }}
-            style={styles.webview}
-            onMessage={handleWebViewMessage}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            onLoadEnd={() => setRefreshing(false)}
-            onNavigationStateChange={(navState) => {
-              canGoBack.current = navState.canGoBack;
-            }}
-            onShouldStartLoadWithRequest={(request) => {
-              // Always open all links inside the WebView itself
-              if (
-                request.url.startsWith("https") ||
-                request.url.startsWith("http")
-              ) {
-                return true;
-              }
-              return false;
-            }}
-            renderLoading={() => (
-              <ActivityIndicator
-                size="large"
-                color="#000"
-                style={styles.loadingIndicator}
-              />
-            )}
-          />
-        </ScrollView>
-        {Platform.OS === "android" && (
-          <View
-            style={{
-              height: 10,
-              backgroundColor: "#fff",
-            }}
-          />
-        )}
-
-      </SafeAreaView>
-    );
-  }
-
-  // Bluetooth Screen
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => setCurrentScreen('webview')}>
-          <Text style={styles.backButton}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Printer Manager</Text>
-        <TouchableOpacity onPress={fetchPairedDevices}>
-          <Text style={styles.refreshText}>↻</Text>
-        </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+
+      {/* WebView Screen - Always mounted to preserve state */}
+      <View style={[styles.webViewContainer, { display: currentScreen === 'webview' ? 'flex' : 'none' }]}>
+        <SafeAreaView style={{ flex: 1 }}>
+          <StatusBar style="dark" />
+
+          {/* Premium Top Bar */}
+          <View style={styles.topBar}>
+            {/* Empty or can add branding later */}
+          </View>
+
+          <ScrollView
+            contentContainerStyle={{ flex: 1 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+              />
+            }
+          >
+            <WebView
+              ref={webViewRef}
+              source={{ uri: WEB_APP_URL }}
+              style={styles.webview}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              startInLoadingState={true}
+              onLoadEnd={() => setRefreshing(false)}
+              onNavigationStateChange={(navState) => {
+                canGoBack.current = navState.canGoBack;
+              }}
+              onShouldStartLoadWithRequest={(request) => {
+                // Always open all links inside the WebView itself
+                if (
+                  request.url.startsWith("https") ||
+                  request.url.startsWith("http")
+                ) {
+                  return true;
+                }
+                return false;
+              }}
+              renderLoading={() => (
+                <ActivityIndicator
+                  size="large"
+                  color="#000"
+                  style={styles.loadingIndicator}
+                />
+              )}
+            />
+          </ScrollView>
+          {Platform.OS === "android" && (
+            <View
+              style={{
+                height: 10,
+                backgroundColor: "#fff",
+              }}
+            />
+          )}
+        </SafeAreaView>
       </View>
 
-      {/* Print Action Area */}
-      {printData && (
-        <View style={styles.printActionArea}>
-          <Text style={styles.printActionTitle}>Ready to Print: {printType}</Text>
-          <TouchableOpacity style={styles.bigPrintButton} onPress={handlePrint}>
-            <Text style={styles.bigPrintButtonText}>PRINT {printType}</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Bluetooth Screen */}
+      {currentScreen === 'bluetooth' && (
+        <SafeAreaView style={[styles.container, { flex: 1 }]}>
+          <StatusBar style="auto" />
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setCurrentScreen('webview')}>
+              <Text style={styles.backButton}>Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>Printer Manager</Text>
+            <TouchableOpacity onPress={fetchPairedDevices}>
+              <Text style={styles.refreshText}>↻</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Print Action Area */}
+          {printData && (
+            <View style={styles.printActionArea}>
+              <Text style={styles.printActionTitle}>Ready to Print: {printType}</Text>
+              <TouchableOpacity style={styles.bigPrintButton} onPress={handlePrint}>
+                <Text style={styles.bigPrintButtonText}>PRINT {printType}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={styles.controls}>
+            <TouchableOpacity
+              style={[styles.button, scanning ? styles.stopButton : styles.scanButton]}
+              onPress={scanning ? stopScan : startScan}
+            >
+              <Text style={styles.buttonText}>{scanning ? "Stop Scan" : "Scan New Devices"}</Text>
+            </TouchableOpacity>
+            {scanning && <ActivityIndicator size="small" color="#007bff" style={{ marginLeft: 10 }} />}
+          </View>
+
+          <SectionList
+            sections={[
+              { title: "Paired Devices", data: pairedDevices },
+              { title: "Available Devices", data: scannedDevices.filter(d => !pairedDevices.find(pd => pd.address === d.address)) }
+            ]}
+            renderItem={renderDeviceItem}
+            renderSectionHeader={({ section: { title, data } }) => (
+              data.length > 0 ? <Text style={styles.sectionHeader}>{title}</Text> : null
+            )}
+            keyExtractor={item => item.address}
+            style={styles.list}
+          />
+        </SafeAreaView>
       )}
-
-      <View style={styles.controls}>
-        <TouchableOpacity
-          style={[styles.button, scanning ? styles.stopButton : styles.scanButton]}
-          onPress={scanning ? stopScan : startScan}
-        >
-          <Text style={styles.buttonText}>{scanning ? "Stop Scan" : "Scan New Devices"}</Text>
-        </TouchableOpacity>
-        {scanning && <ActivityIndicator size="small" color="#007bff" style={{ marginLeft: 10 }} />}
-      </View>
-
-      <SectionList
-        sections={[
-          { title: "Paired Devices", data: pairedDevices },
-          { title: "Available Devices", data: scannedDevices.filter(d => !pairedDevices.find(pd => pd.address === d.address)) }
-        ]}
-        renderItem={renderDeviceItem}
-        renderSectionHeader={({ section: { title, data } }) => (
-          data.length > 0 ? <Text style={styles.sectionHeader}>{title}</Text> : null
-        )}
-        keyExtractor={item => item.address}
-        style={styles.list}
-      />
-    </SafeAreaView>
+    </View>
   );
 }
 
