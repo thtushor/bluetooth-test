@@ -86,7 +86,6 @@ export const generateInvoiceCommands = (data) => {
     // Header: Restaurant name, location, tel
     if (data.businessInfo?.name) {
         builder.add(PrinterCommands.BOLD_ON);
-        builder.add(PrinterCommands.TEXT_DOUBLE_WIDTH);
         builder.textLine(data.businessInfo.name);
         builder.add(PrinterCommands.TEXT_NORMAL);
         builder.add(PrinterCommands.BOLD_OFF);
@@ -161,7 +160,7 @@ export const generateInvoiceCommands = (data) => {
     if (data.summary?.discount && parseFloat(data.summary.discount) > 0) {
         const discountRate = data.summary?.discountRate || '0';
         const discountAmount = data.summary?.discount || 0;
-        const label = `Discount (${discountRate}%)`;
+        const label = `Discount (${discountRate})`;
         const value = `-${formatCurrency(discountAmount)}`;
         builder.textLine(`${label.padEnd(22, ' ')}${value.padStart(10, ' ')}`);
     }
@@ -169,7 +168,7 @@ export const generateInvoiceCommands = (data) => {
     // VAT/Tax
     if (data.summary?.tax && parseFloat(data.summary.tax) > 0) {
         const taxRate = data.summary?.taxRate || '0';
-        const label = `Vat (${taxRate}%)`;
+        const label = `Vat (${taxRate})`;
         const value = formatCurrency(data.summary.tax);
         builder.textLine(`${label.padEnd(22, ' ')}${value.padStart(10, ' ')}`);
     }
