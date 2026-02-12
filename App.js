@@ -305,49 +305,51 @@ export default function App() {
 
           {/* Premium Top Bar */}
           <View style={styles.topBar}>
-            {/* Empty or can add branding later */}
+            <Text style={styles.brandTitle}>GloryPOS</Text>
+            <TouchableOpacity
+              style={styles.topBarReloadButton}
+              onPress={onRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color="#007bff" />
+              ) : (
+                <Text style={{ fontSize: 24, color: '#007bff', fontWeight: 'bold', marginTop: -4 }}>↻</Text>
+              )}
+            </TouchableOpacity>
           </View>
 
-          <ScrollView
-            contentContainerStyle={{ flex: 1 }}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
+          <WebView
+            ref={webViewRef}
+            source={{ uri: WEB_APP_URL }}
+            style={styles.webview}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            onLoadEnd={() => setRefreshing(false)}
+            onNavigationStateChange={(navState) => {
+              canGoBack.current = navState.canGoBack;
+            }}
+            onShouldStartLoadWithRequest={(request) => {
+              // Always open all links inside the WebView itself
+              if (
+                request.url.startsWith("https") ||
+                request.url.startsWith("http")
+              ) {
+                return true;
+              }
+              return false;
+            }}
+            renderLoading={() => (
+              <ActivityIndicator
+                size="large"
+                color="#000"
+                style={styles.loadingIndicator}
               />
-            }
-          >
-            <WebView
-              ref={webViewRef}
-              source={{ uri: WEB_APP_URL }}
-              style={styles.webview}
-              onMessage={handleWebViewMessage}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={true}
-              onLoadEnd={() => setRefreshing(false)}
-              onNavigationStateChange={(navState) => {
-                canGoBack.current = navState.canGoBack;
-              }}
-              onShouldStartLoadWithRequest={(request) => {
-                // Always open all links inside the WebView itself
-                if (
-                  request.url.startsWith("https") ||
-                  request.url.startsWith("http")
-                ) {
-                  return true;
-                }
-                return false;
-              }}
-              renderLoading={() => (
-                <ActivityIndicator
-                  size="large"
-                  color="#000"
-                  style={styles.loadingIndicator}
-                />
-              )}
-            />
-          </ScrollView>
+            )}
+          />
+
           {Platform.OS === "android" && (
             <View
               style={{
@@ -443,31 +445,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     position: 'relative', // Ensure floating button works
   },
-  floatingReloadButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 99,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  topBarReloadButton: {
+    width: 40,
+    height: 40,
+    paddingTop: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
   },
   topBar: {
-    height: 50,
+    height: 60,
     backgroundColor: '#fff',
-    // elevation: 0, // Android shadow
-    // shadowColor: '#000', // iOS shadow
-    // shadowOffset: { width: 0, height: 2 },
-    // shadowOpacity: 0.1,
-    // shadowRadius: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
     zIndex: 10,
   },
   brandTitle: {
