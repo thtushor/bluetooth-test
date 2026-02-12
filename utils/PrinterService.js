@@ -275,21 +275,21 @@ export const generateBarcodeCommands = (data) => {
     // m=73 (Code128)
     if (data.sku) {
         builder.newLine();
-        // ESC/POS Barcode height
-        builder.add([GS, 0x68, 80]); // Height = 80
-        // Barcode width
-        builder.add([GS, 0x77, 2]); // Width = 2
-        // Print position (HRI)
-        builder.add([GS, 0x48, 2]); // Below barcode
+        // ESC/POS Barcode commands
+        builder.add([GS, 0x68, 80]); // Set height to 80
+        builder.add([GS, 0x77, 2]);  // Set width to 2
+        builder.add([GS, 0x48, 2]);  // HRI position: Below
 
-        // Code128 format (simple)
-        // Function B (Code 128)
-        const barcodeBytes = stringToBytes(data.sku);
+        // Code128 (Function B) using GS k 73
+        // Syntax: GS k 73 <length> <data>
+        // Data must usually start with a code set selection. 
+        // {B (0x7B, 0x42) selects Code Set B (alphanumeric).
+        const codeSetB = [0x7B, 0x42];
+        const skuBytes = stringToBytes(data.sku);
+        const barcodeData = [...codeSetB, ...skuBytes];
 
-        // Command: GS k <m> <n> <d1...dn>
-        // m=73 for Code128
-        builder.add([GS, 0x6B, 73, barcodeBytes.length]);
-        builder.add(barcodeBytes);
+        builder.add([GS, 0x6B, 73, barcodeData.length]);
+        builder.add(barcodeData);
 
         builder.newLine();
     }
