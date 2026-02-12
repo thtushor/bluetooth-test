@@ -1,5 +1,6 @@
 
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -16,7 +17,8 @@ import {
   ActivityIndicator,
   SectionList,
   Dimensions,
-  SafeAreaView
+  SafeAreaView,
+  Image
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { formatDataForPrinter } from './utils/PrinterService';
@@ -30,7 +32,10 @@ const eventEmitter = BluetoothModule ? new NativeEventEmitter(BluetoothModule) :
 
 const WEB_APP_URL = 'https://glorypos.com'; // Adjust if needed
 
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
+  const [isAppReady, setIsAppReady] = useState(false);
   const [currentScreen, setCurrentScreen] = useState('webview'); // 'webview' | 'bluetooth'
   const [printData, setPrintData] = useState(null);
   const [printType, setPrintType] = useState(null); // 'INVOICE' | 'KOT' | 'BARCODE'
@@ -48,6 +53,20 @@ export default function App() {
     if (webViewRef.current) webViewRef.current.reload();
   };
 
+  useEffect(() => {
+    const prepare = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setIsAppReady(true);
+        await SplashScreen.hideAsync();
+      }
+    };
+    prepare();
+  }, []);
+
   // Setup Listeners
   useEffect(() => {
     if (!BluetoothModule) return;
@@ -56,6 +75,10 @@ export default function App() {
     if (Platform.OS === 'android') {
       requestPermissions();
     }
+
+    // Simulate loading process
+
+
     fetchPairedDevices();
 
     const deviceFoundListener = eventEmitter.addListener('DeviceFound', (device) => {
@@ -226,6 +249,21 @@ export default function App() {
       </View>
     );
   };
+
+  if (!isAppReady) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff' }}>
+        <Image
+          source={require('./assets/splash.jpg')}
+          style={{ width: '100%', height: '100%', resizeMode: 'cover', position: 'absolute' }}
+        />
+        <View style={{ position: 'absolute', bottom: 120, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={{ marginTop: 10, fontSize: 16, fontWeight: 'bold', color: '#ffffff' }}>Processing...</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (currentScreen === 'webview') {
     return (
