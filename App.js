@@ -463,11 +463,11 @@ const styles = StyleSheet.create({
   topBar: {
     height: 50,
     backgroundColor: '#fff',
-    elevation: 4, // Android shadow
-    shadowColor: '#000', // iOS shadow
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    // elevation: 0, // Android shadow
+    // shadowColor: '#000', // iOS shadow
+    // shadowOffset: { width: 0, height: 2 },
+    // shadowOpacity: 0.1,
+    // shadowRadius: 2,
     zIndex: 10,
   },
   brandTitle: {
