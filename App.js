@@ -22,7 +22,8 @@ import {
   BackHandler,
   ScrollView,
   RefreshControl,
-  ToastAndroid
+  ToastAndroid,
+  StatusBar as RNStatusBar
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
@@ -431,7 +432,7 @@ export default function App() {
 
       {/* WebView Screen */}
       <View style={[styles.webViewContainer, { display: currentScreen === 'webview' ? 'flex' : 'none' }]}>
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1, paddingTop: Platform.OS === 'android' ? RNStatusBar.currentHeight : 0 }}>
           <StatusBar style="dark" />
           <View style={styles.topBar}>
             <TouchableOpacity
@@ -439,22 +440,22 @@ export default function App() {
               style={{ flexDirection: 'row', alignItems: 'center' }}
             >
               <View style={{
-                width: 38, height: 38, borderRadius: 19,
+                width: 24, height: 24, borderRadius: 12,
                 backgroundColor: connectedDevice ? '#e8f5e9' : '#fafafa',
-                alignItems: 'center', justifyContent: 'center', marginRight: 10,
+                alignItems: 'center', justifyContent: 'center', marginRight: 6,
                 borderWidth: 1, borderColor: connectedDevice ? '#c8e6c9' : '#eee'
               }}>
                 <MaterialCommunityIcons
                   name={connectedDevice ? "printer-check" : "bluetooth-connect"}
-                  size={24}
+                  size={14}
                   color={connectedDevice ? "#2e7d32" : "#bdbdbd"}
                 />
               </View>
               <View>
-                <Text style={{ fontSize: 10, color: '#9e9e9e', fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase' }}>
+                <Text style={{ fontSize: 7, color: '#9e9e9e', fontWeight: 'bold', letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   {connectedDevice ? 'CONNECTED PRINTER' : 'NO PRINTER'}
                 </Text>
-                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#424242' }}>
+                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#424242' }}>
                   {connectedDevice ? (connectedDevice.name || 'Unknown Device') : 'Tap to Connect'}
                 </Text>
               </View>
@@ -577,16 +578,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   topBarReloadButton: {
-    width: 40,
-    height: 40,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: 12,
     backgroundColor: '#f8f9fa',
   },
-  reloadIcon: { fontSize: 24, color: '#007bff', fontWeight: 'bold', marginTop: -4 },
+  reloadIcon: { fontSize: 14, color: '#007bff', fontWeight: 'bold' },
   topBar: {
-    height: 60,
+    height: 40,
     backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
