@@ -190,6 +190,34 @@ export const generateInvoiceCommands = (data) => {
     builder.textLine(`TOTAL${formatCurrency(data.summary?.total || 0).padStart(27, ' ')}`);
     builder.add(PrinterCommands.BOLD_OFF);
 
+    builder.newLine();
+
+    // Payment Details
+    if (data.payment) {
+        // Payment Method
+        if (data.payment.method) {
+            const method = data.payment.method === 'mobile_banking' ? 'Mobile Banking' : data.payment.method.toUpperCase();
+            builder.textLine(`Payment Method : ${method}`);
+        }
+
+        // Payment Status
+        if (data.payment.status) {
+            builder.textLine(`Payment Status : ${data.payment.status.toUpperCase()}`);
+        }
+
+        // Paid Amount
+        if (data.payment.paidAmount !== undefined) {
+            builder.add(PrinterCommands.BOLD_ON);
+            builder.textLine(`Paid Amount    : ${formatCurrency(data.payment.paidAmount)}`);
+            builder.add(PrinterCommands.BOLD_OFF);
+        }
+
+        // Remaining Amount (if relevant/partial)
+        if (data.payment.remainingAmount > 0) {
+            builder.textLine(`Remaining      : ${formatCurrency(data.payment.remainingAmount)}`);
+        }
+    }
+
     builder.add(PrinterCommands.ALIGN_CENTER);
     builder.newLine();
     builder.textLine("Thank You!");
