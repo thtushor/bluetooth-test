@@ -24,6 +24,7 @@ import {
   RefreshControl,
   ToastAndroid
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { formatDataForPrinter } from './utils/PrinterService';
 import { byteArrayToBase64 } from './utils/Base64';
@@ -443,9 +444,11 @@ export default function App() {
                 alignItems: 'center', justifyContent: 'center', marginRight: 10,
                 borderWidth: 1, borderColor: connectedDevice ? '#c8e6c9' : '#eee'
               }}>
-                <Text style={{ fontSize: 18, color: connectedDevice ? '#2e7d32' : '#bdbdbd' }}>
-                  {connectedDevice ? '🖨️' : '📡'}
-                </Text>
+                <MaterialCommunityIcons
+                  name={connectedDevice ? "printer-check" : "bluetooth-connect"}
+                  size={24}
+                  color={connectedDevice ? "#2e7d32" : "#bdbdbd"}
+                />
               </View>
               <View>
                 <Text style={{ fontSize: 10, color: '#9e9e9e', fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase' }}>
