@@ -17,6 +17,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
 import android.bluetooth.BluetoothClass
 import java.io.OutputStream
 import java.util.*
+import java.io.IOException
 
 class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
