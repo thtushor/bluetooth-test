@@ -622,6 +622,75 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
     }
 
     @ReactMethod
+    fun isAnySysConnected(promise: Promise) {
+        if (bluetoothAdapter == null) {
+            promise.resolve(false)
+            return
+        }
+        try {
+            if (!checkBluetoothConnectPermission()) {
+                 promise.resolve(false)
+                 return
+            }
+            
+            val bondedDevices = bluetoothAdapter.bondedDevices
+            var isAnyConnected = false
+            
+            for (device in bondedDevices) {
+                try {
+                    val isConnectedMethod = device.javaClass.getMethod("isConnected")
+                    val isConnected = isConnectedMethod.invoke(device) as Boolean
+                    if (isConnected) {
+                        isAnyConnected = true
+                        break
+                    }
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+            
+            promise.resolve(isAnyConnected)
+        } catch (e: Exception) {
+            promise.resolve(false)
+        }
+    }
+
+    @ReactMethod
+    fun getSystemConnectedPairedDevices(promise: Promise) {
+        if (bluetoothAdapter == null) {
+            promise.resolve(Arguments.createArray())
+            return
+        }
+        
+        if (!checkBluetoothConnectPermission()) {
+             promise.reject("PERMISSION_DENIED", "Bluetooth connect permission denied")
+             return
+        }
+
+        val result = Arguments.createArray()
+        val bondedDevices = bluetoothAdapter.bondedDevices
+        
+        bondedDevices.forEach { device ->
+            try {
+                // Use reflection to call hidden isConnected() method
+                val isConnectedMethod = device.javaClass.getMethod("isConnected")
+                val isConnected = isConnectedMethod.invoke(device) as Boolean
+                
+                if (isConnected) {
+                    val map = Arguments.createMap()
+                    map.putString("name", device.name ?: "Unknown Device")
+                    map.putString("address", device.address)
+                    map.putBoolean("bonded", true)
+                    result.pushMap(map)
+                }
+            } catch (e: Exception) {
+                // Method might not exist on some devices or security restrictions
+            }
+        }
+        promise.resolve(result)
+    }
+
+    @ReactMethod
     fun addListener(eventName: String) {}
 
     @ReactMethod

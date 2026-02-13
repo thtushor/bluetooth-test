@@ -89,13 +89,41 @@ export default function App() {
 
       // Check if already connected (native side)
       const current = await BluetoothModule.getConnectedDevice();
+
+      // Check for devices connected to the OS
+      const sysConnectedDevices = await BluetoothModule.getSystemConnectedPairedDevices();
+      console.log("System connected devices:", sysConnectedDevices);
+
       if (current) {
         setConnectedDevice(current);
         ToastAndroid.show(`Connected to ${current.name}`, ToastAndroid.SHORT);
         return;
       }
 
-      // Check for last used printer
+      // PRIORITY 1: Connect to the device actively connected to OS
+      if (sysConnectedDevices && sysConnectedDevices.length > 0) {
+        const target = sysConnectedDevices[0];
+        console.log("Found system-connected device, auto-connecting:", target.name);
+        setIsConnecting(true);
+        try {
+          // We attempt to open a socket to this device
+          await BluetoothModule.connect(target.address);
+          setConnectedDevice(target);
+          // Save it as last used context
+          await BluetoothModule.saveLastPrinter(target.address, target.name || "Unknown");
+          setLastPrinter(target);
+          ToastAndroid.show(`Synced with ${target.name}`, ToastAndroid.SHORT);
+          setIsConnecting(false);
+          return; // Success, we are done
+        } catch (e) {
+          console.warn("Failed to sync with system device", e);
+          // If failed, fall through to try last printer
+        } finally {
+          setIsConnecting(false);
+        }
+      }
+
+      // PRIORITY 2: Check for last used printer
       const last = await BluetoothModule.getLastPrinter();
       if (last) {
         setLastPrinter(last);
@@ -405,7 +433,29 @@ export default function App() {
         <SafeAreaView style={{ flex: 1 }}>
           <StatusBar style="dark" />
           <View style={styles.topBar}>
-            <Text style={styles.brandTitle}>FASHIONGLORY POS</Text>
+            <TouchableOpacity
+              onPress={() => setCurrentScreen('bluetooth')}
+              style={{ flexDirection: 'row', alignItems: 'center' }}
+            >
+              <View style={{
+                width: 38, height: 38, borderRadius: 19,
+                backgroundColor: connectedDevice ? '#e8f5e9' : '#fafafa',
+                alignItems: 'center', justifyContent: 'center', marginRight: 10,
+                borderWidth: 1, borderColor: connectedDevice ? '#c8e6c9' : '#eee'
+              }}>
+                <Text style={{ fontSize: 18, color: connectedDevice ? '#2e7d32' : '#bdbdbd' }}>
+                  {connectedDevice ? '🖨️' : '📡'}
+                </Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 10, color: '#9e9e9e', fontWeight: 'bold', letterSpacing: 1, textTransform: 'uppercase' }}>
+                  {connectedDevice ? 'CONNECTED PRINTER' : 'NO PRINTER'}
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#424242' }}>
+                  {connectedDevice ? (connectedDevice.name || 'Unknown Device') : 'Tap to Connect'}
+                </Text>
+              </View>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.topBarReloadButton}
               onPress={onRefresh}
