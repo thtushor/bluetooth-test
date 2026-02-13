@@ -20,6 +20,10 @@ import java.util.*
 
 class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
 
+    private val PREFS_NAME = "BluetoothPrefs"
+    private val KEY_LAST_ADDRESS = "last_printer_address"
+    private val KEY_LAST_NAME = "last_printer_name"
+
     private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private var bluetoothSocket: BluetoothSocket? = null
     private var outputStream: OutputStream? = null
@@ -33,7 +37,11 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             val action: String? = intent.action
             when(action) {
                 BluetoothDevice.ACTION_FOUND -> {
-                    val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= 33) {
+                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
                     device?.let {
                         if (checkBluetoothConnectPermission()) {
                             val params = Arguments.createMap()
@@ -45,7 +53,11 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                     }
                 }
                 BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
-                    val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= 33) {
+                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
                     val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
                     device?.let {
                          val params = Arguments.createMap()
@@ -58,6 +70,19 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                          })
                          sendEvent("DeviceBondStateChanged", params)
                     }
+                }
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                     val device: BluetoothDevice? = if (Build.VERSION.SDK_INT >= 33) {
+                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                    } else {
+                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                    }
+                     if (device?.address == connectedAddress) {
+                         bluetoothSocket = null
+                         outputStream = null
+                         connectedAddress = null
+                         sendEvent("DeviceDisconnected", null)
+                     }
                 }
             }
         }
@@ -164,6 +189,7 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         val filter = IntentFilter()
         filter.addAction(BluetoothDevice.ACTION_FOUND)
         filter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+        filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
         
         try {
              try {
@@ -532,6 +558,66 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             promise.resolve("Disconnected")
         } catch (e: IOException) {
             promise.reject("DISCONNECT_ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun saveLastPrinter(address: String, name: String, promise: Promise) {
+        val prefs = reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_LAST_ADDRESS, address).putString(KEY_LAST_NAME, name).apply()
+        promise.resolve(true)
+    }
+
+    @ReactMethod
+    fun getLastPrinter(promise: Promise) {
+        val prefs = reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val address = prefs.getString(KEY_LAST_ADDRESS, null)
+        val name = prefs.getString(KEY_LAST_NAME, null)
+        if (address != null) {
+            val map = Arguments.createMap()
+            map.putString("address", address)
+            map.putString("name", name)
+            promise.resolve(map)
+        } else {
+            promise.resolve(null)
+        }
+    }
+    
+    @ReactMethod
+    fun clearLastPrinter(promise: Promise) {
+        val prefs = reactApplicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove(KEY_LAST_ADDRESS).remove(KEY_LAST_NAME).apply()
+        promise.resolve(true)
+    }
+
+    @ReactMethod
+    fun isBluetoothEnabled(promise: Promise) {
+        if (bluetoothAdapter == null) {
+            promise.resolve(false)
+        } else {
+            promise.resolve(bluetoothAdapter.isEnabled)
+        }
+    }
+
+    @ReactMethod
+    fun isConnected(promise: Promise) {
+        promise.resolve(bluetoothSocket?.isConnected == true)
+    }
+
+    @ReactMethod
+    fun getConnectedDevice(promise: Promise) {
+        if (bluetoothSocket?.isConnected == true && connectedAddress != null) {
+            try {
+                val device = bluetoothAdapter?.getRemoteDevice(connectedAddress)
+                val map = Arguments.createMap()
+                map.putString("name", device?.name ?: "Unknown Device")
+                map.putString("address", connectedAddress)
+                promise.resolve(map)
+            } catch (e: Exception) {
+                promise.resolve(null)
+            }
+        } else {
+            promise.resolve(null)
         }
     }
 
