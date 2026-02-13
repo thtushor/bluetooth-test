@@ -130,6 +130,7 @@ export default function App() {
           PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.CAMERA,
         ]);
       }
     } catch (err) {
@@ -305,7 +306,7 @@ export default function App() {
 
           {/* Premium Top Bar */}
           <View style={styles.topBar}>
-            <Text style={styles.brandTitle}>GloryPOS</Text>
+            <Text style={styles.brandTitle}></Text>
             <TouchableOpacity
               style={styles.topBarReloadButton}
               onPress={onRefresh}
