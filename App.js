@@ -104,7 +104,8 @@ export default function App() {
 
       // PRIORITY 1: Connect to the device actively connected to OS
       if (sysConnectedDevices && sysConnectedDevices.length > 0) {
-        const target = sysConnectedDevices[0];
+        // Try to find a printer first
+        const target = sysConnectedDevices.find(d => d.type === 'printer') || sysConnectedDevices[0];
         console.log("Found system-connected device, auto-connecting:", target.name);
         setIsConnecting(true);
         try {
@@ -364,12 +365,28 @@ export default function App() {
     const isPaired = pairedDevices.some(d => d.address === item.address) || item.bonded;
     const isConnected = connectedDevice && connectedDevice.address === item.address;
 
+    const getDeviceIcon = (type) => {
+      console.log({ type })
+      switch (type) {
+        case 'printer': return 'printer';
+        case 'computer': return 'laptop';
+        case 'phone': return 'cellphone';
+        case 'audio': return 'headphones';
+        case 'uncategorized': return 'help-circle-outline';
+        default: return 'bluetooth';
+      }
+    };
+
     return (
       <View style={[styles.deviceItem, isConnected && styles.connectedDeviceItem]}>
+        <View style={styles.iconContainer}>
+          <MaterialCommunityIcons name={getDeviceIcon(item.type)} size={24} color="#555" />
+        </View>
         <View style={styles.deviceInfo}>
           <Text style={styles.deviceName}>{item.name || "Unknown Device"}</Text>
           <Text style={styles.deviceAddress}>{item.address}</Text>
           <View style={styles.tagsRow}>
+            {item.type === 'printer' && <Text style={styles.typeLabel}>Printer</Text>}
             {isPaired && <Text style={styles.pairedLabel}>Paired</Text>}
             {isConnected && <Text style={styles.connectedLabel}>Connected</Text>}
           </View>
@@ -415,11 +432,31 @@ export default function App() {
 
   // Section data preparation
   const activeDeviceSection = connectedDevice ? [{ ...connectedDevice }] : [];
-  const availableDevices = scannedDevices.filter(d =>
-    !pairedDevices.find(pd => pd.address === d.address) &&
-    d.address !== connectedDevice?.address
-  );
-  const pairedDevicesList = pairedDevices.filter(d => d.address !== connectedDevice?.address);
+
+  // Filter available devices: Show Printers & Uncategorized. Hide verified phones/computers/audio unless specific need?
+  // User asked: "prioritize printers only then others" -> implying show others but below? 
+  // User also said "syncing... prioritize printers". 
+  // Let's SHOW all but Sort: Printers First.
+
+  const sortDevices = (a, b) => {
+    const typeScore = (type) => {
+      if (type === 'printer') return 3;
+      if (type === 'uncategorized') return 2;
+      return 1;
+    };
+    return typeScore(b.type) - typeScore(a.type);
+  };
+
+  const availableDevices = scannedDevices
+    .filter(d =>
+      !pairedDevices.find(pd => pd.address === d.address) &&
+      d.address !== connectedDevice?.address
+    )
+    .sort(sortDevices); // Sort printers to top
+
+  const pairedDevicesList = pairedDevices
+    .filter(d => d.address !== connectedDevice?.address)
+    .sort(sortDevices); // Sort printers to top
 
   const sections = [
     ...(connectedDevice ? [{ title: "Connected Device", data: activeDeviceSection }] : []),
@@ -648,8 +685,18 @@ const styles = StyleSheet.create({
   deviceName: { fontSize: 16, fontWeight: 'bold', color: '#333' },
   deviceAddress: { fontSize: 12, color: '#888', marginTop: 2 },
   tagsRow: { flexDirection: 'row', marginTop: 5, gap: 5 },
+  typeLabel: { fontSize: 10, color: '#fff', backgroundColor: '#2196f3', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
   pairedLabel: { fontSize: 10, color: '#fff', backgroundColor: '#aaa', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
   connectedLabel: { fontSize: 10, color: '#fff', backgroundColor: '#4caf50', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, overflow: 'hidden' },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10
+  },
   deviceActions: { flexDirection: 'row', gap: 10 },
   actionButton: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8 },
   pairButton: { backgroundColor: '#ffc107' },

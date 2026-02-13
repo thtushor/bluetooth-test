@@ -14,7 +14,7 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import java.io.IOException
+import android.bluetooth.BluetoothClass
 import java.io.OutputStream
 import java.util.*
 
@@ -48,6 +48,7 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                             params.putString("name", it.name ?: "Unknown Device")
                             params.putString("address", it.address)
                             params.putBoolean("bonded", it.bondState == BluetoothDevice.BOND_BONDED)
+                            params.putString("type", getDeviceType(it))
                             sendEvent("DeviceFound", params)
                         }
                     }
@@ -100,6 +101,27 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
         return "BluetoothModule"
     }
 
+    private fun getDeviceType(device: BluetoothDevice): String {
+        return try {
+            val deviceClass = device.bluetoothClass
+            if (deviceClass == null) return "other"
+            
+            val majorClass = deviceClass.majorDeviceClass
+            // Check for explicit "Uncategorized" class (0x1F) which generic printers often use
+            if (majorClass == 0x1F00) return "uncategorized"
+
+            when (majorClass) {
+                BluetoothClass.Device.Major.IMAGING -> "printer"
+                BluetoothClass.Device.Major.COMPUTER -> "computer"
+                BluetoothClass.Device.Major.PHONE -> "phone"
+                BluetoothClass.Device.Major.AUDIO_VIDEO -> "audio"
+                else -> "other"
+            }
+        } catch (e: Exception) {
+            "other"
+        }
+    }
+
     private fun sendEvent(eventName: String, params: WritableMap?) {
         if (reactApplicationContext.hasActiveCatalystInstance()) {
             reactApplicationContext
@@ -127,6 +149,7 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
             map.putString("name", device.name ?: "Unknown Device")
             map.putString("address", device.address)
             map.putBoolean("bonded", true)
+            map.putString("type", getDeviceType(device))
             result.pushMap(map)
         }
         promise.resolve(result)
@@ -681,6 +704,7 @@ class BluetoothModule(reactContext: ReactApplicationContext) : ReactContextBaseJ
                     map.putString("name", device.name ?: "Unknown Device")
                     map.putString("address", device.address)
                     map.putBoolean("bonded", true)
+                    map.putString("type", getDeviceType(device))
                     result.pushMap(map)
                 }
             } catch (e: Exception) {
