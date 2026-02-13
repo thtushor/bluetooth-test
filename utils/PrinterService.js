@@ -133,12 +133,22 @@ export const generateInvoiceCommands = (data) => {
     if (data.items) {
         data.items.forEach(item => {
             const qty = `${item.quantity}x`;
-            const name = item.productName.substring(0, 18);
             const total = formatCurrency(item.subtotal);
 
+            // Split name into chunks of 18 characters
+            const nameStr = item.productName || "";
+            const nameChunks = nameStr.match(/.{1,18}/g) || [nameStr];
+
+            // Print first line with Qty and Total
             // 32 chars width: Qty(4) + Name(18) + Total(10)
-            const line = `${qty.padEnd(4, ' ')}${name.padEnd(18, ' ')}${total.padStart(10, ' ')}`;
+            const firstChunk = nameChunks[0];
+            const line = `${qty.padEnd(4, ' ')}${firstChunk.padEnd(18, ' ')}${total.padStart(10, ' ')}`;
             builder.textLine(line);
+
+            // Print remaining chunks on new lines indented
+            for (let i = 1; i < nameChunks.length; i++) {
+                builder.textLine(`    ${nameChunks[i]}`);
+            }
 
             // Details on next line (category, etc.)
             if (item.details) {
