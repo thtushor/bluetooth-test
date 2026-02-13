@@ -268,6 +268,8 @@ export default function App() {
       const base64Data = byteArrayToBase64(commands);
       await BluetoothModule.printRawData(base64Data);
       ToastAndroid.show("Print Sent Successfully", ToastAndroid.SHORT);
+      // Go back to POS screen on success
+      setCurrentScreen('webview');
     } catch (e) {
       console.warn("Print Error", e);
       Alert.alert("Print Failed", "Connection problem or printer error. Please check printer.");
