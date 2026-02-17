@@ -524,13 +524,18 @@ export default function App() {
             allowFileAccess={true}
             allowUniversalAccessFromFileURLs={true}
             mixedContentMode="always"
+            mediaPlaybackRequiresUserAction={false}
+            allowsInlineMediaPlayback={true}
+            onPermissionRequest={(request) => {
+              request.grant(request.resources);
+            }}
             onShouldStartLoadWithRequest={(request) => {
               // Allow standard protocols and about:blank for initial load
               const url = request.url;
               if (!url) return true; // Defensive
               if (
-                url.startsWith("https") || 
-                url.startsWith("http") || 
+                url.startsWith("https") ||
+                url.startsWith("http") ||
                 url.startsWith("about:blank") ||
                 url.startsWith("file")
               ) return true;
