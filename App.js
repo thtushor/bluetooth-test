@@ -57,6 +57,7 @@ export default function App() {
   const webViewRef = useRef(null);
   const canGoBack = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [webViewError, setWebViewError] = useState(null);
 
   // --- Initialization & Auto-Connect ---
 
@@ -508,43 +509,97 @@ export default function App() {
             </TouchableOpacity>
           </View>
 
-          <WebView
-            ref={webViewRef}
-            source={{ uri: WEB_APP_URL }}
-            style={styles.webview}
-            onMessage={handleWebViewMessage}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            startInLoadingState={true}
-            onLoadEnd={() => setRefreshing(false)}
-            onNavigationStateChange={(navState) => {
-              canGoBack.current = navState.canGoBack;
-            }}
-            originWhitelist={['*']}
-            allowFileAccess={true}
-            allowUniversalAccessFromFileURLs={true}
-            mixedContentMode="always"
-            mediaPlaybackRequiresUserAction={false}
-            allowsInlineMediaPlayback={true}
-            onPermissionRequest={(request) => {
-              request.grant(request.resources);
-            }}
-            onShouldStartLoadWithRequest={(request) => {
-              // Allow standard protocols and about:blank for initial load
-              const url = request.url;
-              if (!url) return true; // Defensive
-              if (
-                url.startsWith("https") ||
-                url.startsWith("http") ||
-                url.startsWith("about:blank") ||
-                url.startsWith("file")
-              ) return true;
-              return false;
-            }}
-            renderLoading={() => (
-              <ActivityIndicator size="large" color="#000" style={styles.loadingIndicator} />
-            )}
-          />
+          {webViewError ? (
+            <View style={styles.errorContainer}>
+              <MaterialCommunityIcons name="wifi-off" size={48} color="#d32f2f" />
+              <Text style={styles.errorTitle}>Connection Failed</Text>
+              <Text style={styles.errorText}>
+                {webViewError.description || 'Could not load the application.'}
+              </Text>
+              {(webViewError.code === -2 || webViewError.description === 'net::ERR_NAME_NOT_RESOLVED') && (
+                <Text style={styles.errorHint}>
+                  Please check your internet connection and try again.
+                </Text>
+              )}
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={() => {
+                  setWebViewError(null);
+                  setRefreshing(true);
+                  setTimeout(() => {
+                    if (webViewRef.current) {
+                      webViewRef.current.reload();
+                    }
+                  }, 100);
+                }}
+              >
+                <Text style={styles.retryButtonText}>Retry Connection</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <WebView
+              ref={webViewRef}
+              source={{ uri: WEB_APP_URL }}
+              style={styles.webview}
+              onMessage={handleWebViewMessage}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              databaseEnabled={true}
+              startInLoadingState={true}
+              sharedCookiesEnabled={true}
+              thirdPartyCookiesEnabled={true}
+              setSupportMultipleWindows={false}
+              androidLayerType="hardware"
+              textZoom={100}
+              onLoadEnd={() => {
+                setRefreshing(false);
+                setWebViewError(null);
+              }}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                // -2 is ERR_NAME_NOT_RESOLVED, -6 is ERR_CONNECTION_CLOSED
+                if (nativeEvent.code === -2 || nativeEvent.code === -6 || nativeEvent.description === 'net::ERR_NAME_NOT_RESOLVED') {
+                  setWebViewError(nativeEvent);
+                }
+              }}
+              onHttpError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                if (nativeEvent.statusCode >= 500) {
+                  setWebViewError({ description: `Server Error (${nativeEvent.statusCode})`, code: nativeEvent.statusCode });
+                }
+              }}
+              onRenderProcessGone={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                setWebViewError({ description: 'The optimization process crashed. Reloading...', code: 'CRASH' });
+              }}
+              onNavigationStateChange={(navState) => {
+                canGoBack.current = navState.canGoBack;
+              }}
+              originWhitelist={['*']}
+              allowFileAccess={true}
+              allowUniversalAccessFromFileURLs={true}
+              mixedContentMode="always"
+              mediaPlaybackRequiresUserAction={false}
+              allowsInlineMediaPlayback={true}
+              onPermissionRequest={(request) => {
+                request.grant(request.resources);
+              }}
+              onShouldStartLoadWithRequest={(request) => {
+                const url = request.url;
+                if (!url) return true;
+                if (
+                  url.startsWith("https") ||
+                  url.startsWith("http") ||
+                  url.startsWith("about:blank") ||
+                  url.startsWith("file")
+                ) return true;
+                return false;
+              }}
+              renderLoading={() => (
+                <ActivityIndicator size="large" color="#000" style={styles.loadingIndicator} />
+              )}
+            />
+          )}
           {Platform.OS === "android" && <View style={{ height: 10, backgroundColor: "#fff" }} />}
         </SafeAreaView>
       </View>
@@ -723,5 +778,44 @@ const styles = StyleSheet.create({
   disconnectButton: { backgroundColor: '#ff5252' },
   disabledButton: { opacity: 0.6 },
   actionButtonText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  emptyText: { textAlign: 'center', marginTop: 50, color: '#888' }
+  emptyText: { textAlign: 'center', marginTop: 50, color: '#888' },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#fff',
+  },
+  errorTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorHint: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 30,
+    fontStyle: 'italic',
+  },
+  retryButton: {
+    backgroundColor: '#007bff',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    elevation: 3,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
