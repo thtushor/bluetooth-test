@@ -520,8 +520,20 @@ export default function App() {
             onNavigationStateChange={(navState) => {
               canGoBack.current = navState.canGoBack;
             }}
+            originWhitelist={['*']}
+            allowFileAccess={true}
+            allowUniversalAccessFromFileURLs={true}
+            mixedContentMode="always"
             onShouldStartLoadWithRequest={(request) => {
-              if (request.url.startsWith("https") || request.url.startsWith("http")) return true;
+              // Allow standard protocols and about:blank for initial load
+              const url = request.url;
+              if (!url) return true; // Defensive
+              if (
+                url.startsWith("https") || 
+                url.startsWith("http") || 
+                url.startsWith("about:blank") ||
+                url.startsWith("file")
+              ) return true;
               return false;
             }}
             renderLoading={() => (
