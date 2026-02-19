@@ -29,8 +29,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { formatDataForPrinter } from './utils/PrinterService';
 import { byteArrayToBase64 } from './utils/Base64';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 
 const { BluetoothModule } = NativeModules;
 const eventEmitter = BluetoothModule ? new NativeEventEmitter(BluetoothModule) : {
@@ -235,25 +236,36 @@ export default function App() {
       const data = JSON.parse(event.nativeEvent.data);
       // Expected format: { type: 'PRINT_INVOICE' | 'PRINT_KOT' | 'PRINT_BARCODE' | 'PRINT_BARCODE_LABEL' | 'DOWNLOAD_IMAGE', payload: object }
 
+
+
       if (data.type === 'DOWNLOAD_IMAGE') {
         const { fileName, base64 } = data.payload;
         try {
+          // Request permissions if not already granted
+          const { status } = await MediaLibrary.requestPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert("Permission Denied", "We need permission to save images to your gallery.");
+            return;
+          }
+
           const fileUri = FileSystem.documentDirectory + fileName;
           // Strip the data:image/png;base64, prefix if present
           const base64Data = base64.split('base64,')[1] || base64;
 
           await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-            encoding: FileSystem.EncodingType.Base64,
+            encoding: 'base64',
           });
 
-          if (await Sharing.isAvailableAsync()) {
-            await Sharing.shareAsync(fileUri);
-          } else {
-            Alert.alert("Download Saved", "Image saved to app documents.");
-          }
+          // Save to Gallery
+          const asset = await MediaLibrary.createAssetAsync(fileUri);
+          // Optional: Create an album
+          // await MediaLibrary.createAlbumAsync("FashionGlory", asset, false);
+
+          Alert.alert("Saved", "Image saved to Gallery!");
+
         } catch (e) {
           console.error("Download Error", e);
-          Alert.alert("Error", "Failed to save image.");
+          Alert.alert("Error", "Failed to save image: " + e.message);
         }
         return;
       }

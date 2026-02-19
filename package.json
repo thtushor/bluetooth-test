@@ -12,6 +12,7 @@
     "@expo/vector-icons": "^15.0.3",
     "expo": "~54.0.33",
     "expo-file-system": "~19.0.21",
+    "expo-media-library": "~18.2.1",
     "expo-sharing": "~14.0.8",
     "expo-splash-screen": "^31.0.13",
     "expo-status-bar": "~3.0.9",
