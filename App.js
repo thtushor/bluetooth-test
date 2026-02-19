@@ -29,6 +29,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { formatDataForPrinter } from './utils/PrinterService';
 import { byteArrayToBase64 } from './utils/Base64';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 const { BluetoothModule } = NativeModules;
 const eventEmitter = BluetoothModule ? new NativeEventEmitter(BluetoothModule) : {
@@ -231,7 +233,30 @@ export default function App() {
   const handleWebViewMessage = async (event) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      // Expected format: { type: 'PRINT_INVOICE' | 'PRINT_KOT' | 'PRINT_BARCODE' | 'PRINT_BARCODE_LABEL', payload: object }
+      // Expected format: { type: 'PRINT_INVOICE' | 'PRINT_KOT' | 'PRINT_BARCODE' | 'PRINT_BARCODE_LABEL' | 'DOWNLOAD_IMAGE', payload: object }
+
+      if (data.type === 'DOWNLOAD_IMAGE') {
+        const { fileName, base64 } = data.payload;
+        try {
+          const fileUri = FileSystem.documentDirectory + fileName;
+          // Strip the data:image/png;base64, prefix if present
+          const base64Data = base64.split('base64,')[1] || base64;
+
+          await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri);
+          } else {
+            Alert.alert("Download Saved", "Image saved to app documents.");
+          }
+        } catch (e) {
+          console.error("Download Error", e);
+          Alert.alert("Error", "Failed to save image.");
+        }
+        return;
+      }
 
       if (data.type && data.type.startsWith('PRINT_')) {
         const type = data.type.replace('PRINT_', '');
